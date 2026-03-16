@@ -6,7 +6,7 @@
                 "multilogin",
                 "network",
                 "firewall",
-                "mwan3"
+                "mwan4"
             ],
             "file": [
                 "/etc/multilogin/*",
@@ -21,6 +21,9 @@
                 ],
                 "multilogin": [
                     "list_auto"
+                ],
+                "mwan4": [
+                    "status"
                 ]
             }
         },
@@ -29,7 +32,7 @@
                 "multilogin",
                 "network",
                 "firewall",
-                "mwan3"
+                "mwan4"
             ],
             "file": [
                 "/etc/multilogin/login.sh",

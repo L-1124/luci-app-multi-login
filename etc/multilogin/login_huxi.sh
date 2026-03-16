@@ -10,7 +10,7 @@ LOG_LEVEL=1         # 默认日志等级 INFO (0=DEBUG, 1=INFO, 2=ERROR)
 # --- 参数解析 ---
 while [ $# -gt 0 ]; do
     case $1 in
-        --mwan3)
+        --mwan4)
             INTERFACE="$2"
             shift 2
             ;;
@@ -62,16 +62,15 @@ log() {
 }
 
 # --- 统一的网络请求封装 ---
-# 处理 mwan3 调用和超时逻辑
 curl_req() {
     local url="$1"
-    mwan3 use "$INTERFACE" curl -s --connect-timeout "$CURL_CONNECT_TIMEOUT" -m "$CURL_MAX_TIME" "$url"
+    mwan4 use "$INTERFACE" curl -s --connect-timeout "$CURL_CONNECT_TIMEOUT" -m "$CURL_MAX_TIME" "$url"
 }
 
 # --- 初始化检查 ---
 init_check() {
     if [ -z "$INTERFACE" ] || [ -z "$WLAN_USER_ACCOUNT" ] || [ -z "$WLAN_USER_PASSWORD" ]; then
-        log 2 "缺少必要的参数 --mwan3, --account, 或 --password"
+        log 2 "缺少必要的参数 --mwan4, --account, 或 --password"
         exit 4
     fi
 
@@ -124,7 +123,6 @@ check_status() {
 do_login() {
     local LOGIN_URL=""
 
-    # 根据UA类型选择最新的URL和参数
     if [ "$UA_TYPE" = "pc" ]; then
         LOGIN_URL="http://login.cqu.edu.cn:801/eportal/portal/login?callback=dr1004&login_method=1&user_account=%2C0%2C$WLAN_USER_ACCOUNT&user_password=$WLAN_USER_PASSWORD&wlan_user_ip=$WLAN_USER_IP&wlan_user_ipv6=&wlan_user_mac=000000000000&wlan_ac_ip=&wlan_ac_name=&term_ua=$PC_UA&term_type=1&jsVersion=4.2.2&terminal_type=1&lang=zh-cn&v=1176&lang=zh-cn"
     else
@@ -177,5 +175,4 @@ main() {
     fi
 }
 
-# 执行主程序
 main

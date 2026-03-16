@@ -10,7 +10,7 @@ LOG_LEVEL=1 # 默认日志等级 INFO (0=DEBUG, 1=INFO, 2=ERROR)
 # 参数解析
 while [ $# -gt 0 ]; do
     case $1 in
-        --mwan3)
+        --mwan4)
             INTERFACE="$2"
             shift 2
             ;;
@@ -57,7 +57,7 @@ log() {
 
 # 检查必需参数
 if [ -z "$INTERFACE" ] || [ -z "$WLAN_USER_ACCOUNT" ] || [ -z "$WLAN_USER_PASSWORD" ]; then
-    log 2 "错误: 缺少必要的参数 --mwan3, --account, 或 --password"
+    log 2 "错误: 缺少必要的参数 --mwan4, --account, 或 --password"
     exit 4
 fi
 
@@ -86,7 +86,7 @@ MOBILE_UA="Mozilla%2F5.0%20(Linux%3B%20Android%208.0.0%3B%20SM-G955U%20Build%2FR
 check_status() {
     # 状态接口域名同步更新为 login.cqu.edu.cn
     local status_url="http://login.cqu.edu.cn/drcom/chkstatus?callback=dr1002&jsVersion=4.X&v=5505&lang=zh"
-    local response=$(mwan3 use $INTERFACE curl -s "$status_url")
+    local response=$(mwan4 use $INTERFACE curl -s "$status_url")
     
     # 提取JSON中的result字段
     local result=$(echo "$response" | grep -o '"result":[0-9]' | cut -d':' -f2)
@@ -113,7 +113,7 @@ do_login() {
     fi
     
     log 1 "尝试登录 ($UA_TYPE UA)，使用IP: $WLAN_USER_IP"
-    local response=$(mwan3 use $INTERFACE curl -s "$LOGIN_URL")
+    local response=$(mwan4 use $INTERFACE curl -s "$LOGIN_URL")
     
     local json_response=$(echo "$response" | grep -o '{.*}')
     

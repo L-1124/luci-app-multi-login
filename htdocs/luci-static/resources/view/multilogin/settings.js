@@ -73,7 +73,7 @@ return view.extend({
 
         var m, s, o;
         m = new form.Map('multilogin', _('自动登录配置'),
-            _('配置各登录实例及全局参数。每个实例绑定一个逻辑接口与一个账户，由 mwan3 监控接口状态，离线时自动重新登录。请先在「账户管理」页添加账户，在「虚拟接口」页生成接口，再回此处创建实例。'));
+            _('配置各登录实例及全局参数。每个实例绑定一个逻辑接口与一个账户，由 mwan4 监控接口状态，离线时自动重新登录。请先在「账户管理」页添加账户，在「虚拟接口」页生成接口，再回此处创建实例。'));
 
         // ---- 全局设置 ----
         s = m.section(form.TypedSection, 'settings', _('全局设置'));
@@ -87,7 +87,7 @@ return view.extend({
         o.datatype = 'uinteger';
         o.default = '4';
 
-        o = s.option(form.Value, 'check_interval', _('状态检查间隔(秒)'), _('每隔多少秒检查一次mwan3接口状态'));
+        o = s.option(form.Value, 'check_interval', _('状态检查间隔(秒)'), _('每隔多少秒检查一次 mwan4 接口状态'));
         o.datatype = 'uinteger';
         o.default = '5';
 
@@ -119,7 +119,7 @@ return view.extend({
         } else {
             o.value('wan', 'wan');
         }
-        o.description = _('选择 mwan3 管理的逻辑接口');
+        o.description = _('选择 mwan4 管理的逻辑接口');
 
         // 账号：下拉选择，从 account section 读取
         o = s4.option(form.ListValue, 'account', _('账号'));

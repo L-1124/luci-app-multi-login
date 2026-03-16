@@ -14,7 +14,7 @@ define Package/luci-app-multilogin
 	SUBMENU:=3. Applications
 	TITLE:=Multi-WAN Auto Login Manager
 	PKGARCH:=all
-	DEPENDS:=+mwan3 +curl +bash +luci-compat +luci-app-mwan3
+	DEPENDS:=+mwan4 +curl +bash +luci-compat
 endef
 
 define Package/luci-app-multilogin/description

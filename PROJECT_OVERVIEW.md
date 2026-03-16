@@ -41,7 +41,7 @@ luci-app-multilogin/
 - **作用**: 主控制守护进程
 - **功能**:
   - 从 UCI 加载配置
-  - 定期检查 mwan3 接口状态
+  - 定期检查 mwan4 接口状态
   - 接口离线时调用 login.sh 登录
   - 失败重试机制（指数退避）
   - 日志记录
@@ -74,7 +74,7 @@ luci-app-multilogin/
 - **功能**:
   - 定义软件包信息
   - 安装文件到正确位置
-  - 设置依赖关系（mwan3, curl）
+  - 设置依赖关系（mwan4, curl）
   - 安装后操作（启用服务）
 
 ## 工作流程
@@ -90,7 +90,7 @@ luci-app-multilogin/
    ↓
 5. login_control.bash 加载 UCI 配置
    ↓
-6. 定期检查 mwan3 接口状态
+6. 定期检查 mwan4 接口状态
    ↓
 7. 发现离线接口 → 调用 login.sh
    ↓
@@ -245,7 +245,7 @@ logread | grep multilogin
 ### 手动测试登录脚本
 ```bash
 /etc/multilogin/login.sh \
-  --mwan3 wan \
+  --mwan4 wan \
   --account your_account \
   --password your_password \
   --ua-type pc
@@ -261,8 +261,8 @@ pgrep -f login_control.bash
 # 查看进程详情
 ps | grep login_control
 
-# 查看 mwan3 状态
-mwan3 interfaces
+# 查看 mwan4 状态
+mwan4 interfaces
 ```
 
 ### 检查配置
@@ -284,7 +284,7 @@ A:
 
 ### Q: 登录失败
 A:
-1. 检查 mwan3 配置：`mwan3 interfaces`
+1. 检查 mwan4 配置：`mwan4 interfaces`
 2. 手动测试登录脚本
 3. 检查网络连接：`ping -I wan 10.254.7.4`
 

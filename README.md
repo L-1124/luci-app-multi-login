@@ -1,7 +1,7 @@
 # LuCI App MultiLogin
 
 OpenWrt/LEDE 多wan自动登录 LuCI 应用
-适用于 OpenWrt 23.05+ 以及 mwan3 2.10+
+适用于 OpenWrt 23.05+ 以及 mwan4
 ## 功能特性
 
 ![主页1](./images/account.png)
@@ -35,7 +35,7 @@ OpenWrt/LEDE 多wan自动登录 LuCI 应用
 
 ### 核心功能
 -  支持多个 WAN 口同时管理
--  自动监控 mwan3 接口状态
+-  自动监控 mwan4 接口状态
 -  接口离线时自动尝试登录
 -  支持 PC 和移动端 User-Agent 类型
 -  失败重试机制（指数退避）
@@ -43,14 +43,14 @@ OpenWrt/LEDE 多wan自动登录 LuCI 应用
 
 ### 2.0 新特性
 -  **现代化架构**：从 Lua CBI 重构为 JS + rpcd 架构
--  **虚拟接口快速生成**：一键创建 macvlan 设备，自动配置 network、firewall 和 mwan3
+-  **虚拟接口快速生成**：一键创建 macvlan 设备，自动配置 network、firewall 和 mwan4
 -  **账户统一管理**：集中管理账户信息，实例配置可直接引用
 -  **模块化界面**：5 个独立页面，清晰的功能分离
 -  **在线脚本编辑**：直接在 Web 界面编辑登录脚本
 -  **实时日志查看**：无需 SSH，直接在界面查看运行日志
 ## 原理
 
-本方案通过 mwan3 的接口状态监控能力与自定义脚本联动，实现智能流量调度和故障自愈。
+本方案通过 mwan4 的接口状态监控能力与自定义脚本联动，实现智能流量调度和故障自愈。
 
 ### 工作流程
 
@@ -59,8 +59,8 @@ graph TD
     A[快速生成虚拟接口] --> B[创建macvlan设备]
     B --> C[配置DHCP逻辑接口]
     C --> D[添加到防火墙WAN区]
-    D --> E[配置mwan3接口跟踪]
-    E --> F[mwan3监控接口状态]
+    D --> E[配置mwan4接口跟踪]
+    E --> F[mwan4监控接口状态]
     F --> G{接口在线?}
     G -->|在线| H[按权重分配流量]
     G -->|离线| I[触发登录脚本]
@@ -78,18 +78,18 @@ graph TD
 1. **虚拟接口层**: 基于 macvlan 技术，在单个物理网卡上创建多个虚拟接口，每个接口获取独立的 MAC 地址和 IP
 2. **网络配置层**: 每个虚拟接口配置为 DHCP 客户端，自动获取 IP 地址，并设置不同的路由跃点
 3. **防火墙层**: 将所有虚拟接口加入 WAN 区域，实现统一的防火墙策略和 NAT 转换
-4. **负载均衡层**: mwan3 监控所有接口健康状态（通过 ping 国内 DNS 服务器），根据权重分配流量
-5. **故障自愈层**: 接口离线时，控制脚本自动调用登录脚本进行认证，成功后 mwan3 自动恢复该接口的流量分配
+4. **负载均衡层**: mwan4 监控所有接口健康状态（通过 ping 国内 DNS 服务器），根据权重分配流量
+5. **故障自愈层**: 接口离线时，控制脚本自动调用登录脚本进行认证，成功后 mwan4 自动恢复该接口的流量分配
 
 详细配置过程请见 [我的博客](https://blog.zesuy.top)。
 
 ## 依赖
 
-- `mwan3` - 多 WAN 连接管理
+- `mwan4` - 多 WAN 连接管理
 - `curl` - HTTP 请求工具
 - `bash` - Shell 脚本执行环境
 - `luci-compat` - LuCI 兼容层
-- `luci-app-mwan3` - mwan3 Web 界面（推荐，用于手动调整 mwan3 配置）
+- `luci-app-mwan4` - mwan4 Web 界面（推荐，用于手动调整 mwan4 配置）
 
 ## 安装
 
@@ -134,7 +134,7 @@ graph TD
 
 #### 2. 虚拟接口管理
 
-快速生成基于 macvlan 的虚拟接口，并自动配置 mwan3 负载均衡。
+快速生成基于 macvlan 的虚拟接口，并自动配置 mwan4 负载均衡。
 
 **当前配置状态**
 - 显示已生成的所有 `auto_` 接口
@@ -148,8 +148,8 @@ graph TD
   - 创建 macvlan 虚拟设备（`auto_eth0_1`, `auto_eth0_2`, ...）
   - 创建 DHCP 逻辑接口（`auto_vwan_1`, `auto_vwan_2`, ...）
   - 添加到防火墙 WAN 区域
-  - 配置 mwan3 接口跟踪（4 个国内 DNS 作为健康检测目标）
-  - 配置 mwan3 成员和负载均衡策略
+  - 配置 mwan4 接口跟踪（4 个国内 DNS 作为健康检测目标）
+  - 配置 mwan4 成员和负载均衡策略
   - 自动分配路由跃点（11, 12, 13, ...）
 
 > **注意**: 生成的接口均以 `auto_` 为前缀，重新生成会覆盖旧配置。配置完成后，请前往「自动登录配置」为每个接口创建登录实例。
@@ -161,7 +161,7 @@ graph TD
 **全局设置**
 - **启用自动登录**: 主开关，控制整个服务的启用/禁用
 - **初始重试间隔**: 登录失败后的初始延迟时间（秒），默认 4 秒
-- **状态检查间隔**: 检查 mwan3 接口状态的频率（秒），默认 5 秒
+- **状态检查间隔**: 检查 mwan4 接口状态的频率（秒），默认 5 秒
 - **最大重试延迟**: 重试延迟的上限（秒），默认 16384 秒
 - **已登录状态延迟**: 检测到已登录但接口离线时的延迟（秒），默认 16 秒
 
@@ -171,7 +171,7 @@ graph TD
 
 - **启用**: 控制此实例是否启用
 - **别名**: 为实例设置易于识别的名称（如：PC登录1）
-- **逻辑接口**: 从下拉框选择 mwan3 管理的逻辑接口（自动读取 network 配置）
+- **逻辑接口**: 从下拉框选择 mwan4 管理的逻辑接口（自动读取 network 配置）
 - **账号**: 从下拉框选择已在"账户管理"页面添加的账户
 - **UA类型**: 选择 PC 或移动端 User-Agent
 
@@ -187,7 +187,7 @@ graph TD
 - 修改后保存并重启服务生效
 
 脚本接收参数：
-- `--mwan3 <interface>`: 逻辑接口名
+- `--mwan4 <interface>`: 逻辑接口名
 - `--account <username>`: 账号
 - `--password <password>`: 密码
 - `--ua-type <pc|mobile>`: UA类型
@@ -259,9 +259,9 @@ logread | grep multi_login
 ### 登录失败
 
 1.  在 Web 界面查看「运行日志」页面，查找错误信息
-2.  检查接口名称是否与 mwan3 中的名称一致：
+2.  检查接口名称是否与 mwan4 中的名称一致：
     ```bash
-    mwan3 interfaces
+    mwan4 interfaces
     uci show network | grep interface
     ```
 3.  检查账号和密码是否正确（在「账户管理」页面）
@@ -272,7 +272,7 @@ logread | grep multi_login
 5.  手动测试登录脚本：
     ```bash
     /etc/multilogin/login.sh \
-      --mwan3 auto_vwan_1 \
+      --mwan4 auto_vwan_1 \
       --account your_account \
       --password your_password \
       --ua-type pc
@@ -288,9 +288,9 @@ logread | grep multi_login
     ```bash
     ifstatus auto_vwan_1
     ```
-3.  检查 mwan3 接口状态：
+3.  检查 mwan4 接口状态：
     ```bash
-    mwan3 status
+    mwan4 status
     ```
 4.  如果配置混乱，可以在「虚拟接口」页面删除所有 `auto_` 配置重新生成
 
@@ -301,7 +301,7 @@ logread | grep multi_login
     ```bash
     /etc/init.d/multilogin restart
     /etc/init.d/network reload
-    /etc/init.d/mwan3 restart
+    /etc/init.d/mwan4 restart
     ```
 3.  检查 UCI 配置是否已生效：
     ```bash
@@ -339,7 +339,7 @@ logread | grep multi_login
 
 ```bash
 /etc/multilogin/login.sh \
-  --mwan3 <interface> \
+  --mwan4 <interface> \
   --account <username> \
   --password <password> \
   --ua-type <pc|mobile>
@@ -358,7 +358,7 @@ logread | grep multi_login
 
 ```bash
 /etc/multilogin/login.sh \
-  --mwan3 auto_vwan_1 \
+  --mwan4 auto_vwan_1 \
   --account your_account \
   --password your_password \
   --ua-type pc

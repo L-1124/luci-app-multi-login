@@ -10,7 +10,7 @@ LOG_LEVEL=1       # 默认日志等级 INFO (0=DEBUG, 1=INFO, 2=ERROR)
 # --- 参数解析 ---
 while [ $# -gt 0 ]; do
     case $1 in
-        --mwan3)
+        --mwan4)
             INTERFACE="$2"
             shift 2
             ;;
@@ -63,17 +63,17 @@ log() {
 }
 
 # --- 统一的网络请求封装 ---
-# 处理 mwan3 调用和超时逻辑
+# 处理 mwan4 调用和超时逻辑
 curl_req() {
     local url="$1"
     # 使用 --connect-timeout 限制连接时间，-m 限制总传输时间
-    mwan3 use "$INTERFACE" curl -s --connect-timeout "$CURL_CONNECT_TIMEOUT" -m "$CURL_MAX_TIME" "$url"
+    mwan4 use "$INTERFACE" curl -s --connect-timeout "$CURL_CONNECT_TIMEOUT" -m "$CURL_MAX_TIME" "$url"
 }
 
 # --- 初始化检查 ---
 init_check() {
     if [ -z "$INTERFACE" ] || [ -z "$WLAN_USER_ACCOUNT" ] || [ -z "$WLAN_USER_PASSWORD" ]; then
-        log 2 "缺少必要的参数 --mwan3, --account, 或 --password"
+        log 2 "缺少必要的参数 --mwan4, --account, 或 --password"
         exit 4
     fi
 
