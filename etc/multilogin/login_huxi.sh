@@ -4,10 +4,10 @@
 INTERFACE=""
 WLAN_USER_ACCOUNT=""
 WLAN_USER_PASSWORD=""
-UA_TYPE="mobile"  # 默认使用mobile UA
-LOG_LEVEL=1 # 默认日志等级 INFO (0=DEBUG, 1=INFO, 2=ERROR)
+UA_TYPE="mobile"  # 默认使用 mobile UA
+LOG_LEVEL=1         # 默认日志等级 INFO (0=DEBUG, 1=INFO, 2=ERROR)
 
-# 参数解析
+# --- 参数解析 ---
 while [ $# -gt 0 ]; do
     case $1 in
         --mwan3)
@@ -32,8 +32,14 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# 日志函数
-# LOG_LEVEL: 0=DEBUG, 1=INFO, 2=ERROR
+# --- 基础配置 ---
+CURL_CONNECT_TIMEOUT=3
+CURL_MAX_TIME=5
+PC_UA="Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20Chrome%2F144.0.0.0%20Safari%2F537.36%20Edg%2F144.0.0.0"
+MOBILE_UA="Mozilla%2F5.0%20(Linux%3B%20Android%208.0.0%3B%20SM-G955U%20Build%2FR16NW)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20Chrome%2F144.0.0.0%20Mobile%20Safari%2F537.36%20Edg%2F144.0.0.0"
+
+# --- 日志函数 ---
+# 级别: 0=DEBUG, 1=INFO, 2=ERROR
 log() {
     local level_num=$1
     local msg="$2"
@@ -45,111 +51,131 @@ log() {
             1) level_text="INFO" ;;
             2) level_text="ERROR" ;;
         esac
-        
+
         local log_msg="[$(date '+%Y-%m-%d %H:%M:%S')] [$INTERFACE] [$level_text] $msg"
         echo "$log_msg" >> /var/log/multilogin.log
-        # Also send to syslog
-        level_text_lower=$(echo "$level_text" | tr '[:upper:]' '[:lower:]')
-        logger -t "multi_login_sh" -p user.${level_text_lower} "$log_msg"
+
+        local level_text_lower=$(echo "$level_text" | tr '[:upper:]' '[:lower:]')
+        logger -t "multi_login_sh" -p "user.${level_text_lower}" "$log_msg"
         echo "$log_msg"
     fi
 }
 
-# 检查必需参数
-if [ -z "$INTERFACE" ] || [ -z "$WLAN_USER_ACCOUNT" ] || [ -z "$WLAN_USER_PASSWORD" ]; then
-    log 2 "错误: 缺少必要的参数 --mwan3, --account, 或 --password"
-    exit 4
-fi
+# --- 统一的网络请求封装 ---
+# 处理 mwan3 调用和超时逻辑
+curl_req() {
+    local url="$1"
+    mwan3 use "$INTERFACE" curl -s --connect-timeout "$CURL_CONNECT_TIMEOUT" -m "$CURL_MAX_TIME" "$url"
+}
 
-# 通过逻辑接口名获取物理接口名
-PHYSICAL_INTERFACE=$(/sbin/uci get network.$INTERFACE.device)
-if [ -z "$PHYSICAL_INTERFACE" ]; then
-    log 2 "错误: 无法通过uci获取接口 '$INTERFACE' 的物理设备名称 (device)"
-    exit 5
-fi
-log 0 "调试: 逻辑接口 '$INTERFACE' 对应的物理接口是 '$PHYSICAL_INTERFACE'"
+# --- 初始化检查 ---
+init_check() {
+    if [ -z "$INTERFACE" ] || [ -z "$WLAN_USER_ACCOUNT" ] || [ -z "$WLAN_USER_PASSWORD" ]; then
+        log 2 "缺少必要的参数 --mwan3, --account, 或 --password"
+        exit 4
+    fi
 
-# 获取当前的 MAC 地址和 IP 地址
-WLAN_USER_MAC=$(cat /sys/class/net/$PHYSICAL_INTERFACE/address)
-WLAN_USER_IP=$(ifconfig $PHYSICAL_INTERFACE | grep 'inet ' | awk '{print $2}' | sed 's/addr://')
+    PHYSICAL_INTERFACE=$(/sbin/uci get "network.$INTERFACE.device" 2>/dev/null)
+    if [ -z "$PHYSICAL_INTERFACE" ]; then
+        log 2 "无法通过uci获取逻辑接口 '$INTERFACE' 的物理设备名称"
+        exit 5
+    fi
+    log 0 "逻辑接口 '$INTERFACE' 对应的物理接口是 '$PHYSICAL_INTERFACE'"
 
-if [ -z "$WLAN_USER_IP" ]; then
-    log 2 "错误: 无法获取接口 '$PHYSICAL_INTERFACE' 的IP地址"
-    exit 6
-fi
+    WLAN_USER_MAC=$(cat "/sys/class/net/$PHYSICAL_INTERFACE/address" 2>/dev/null | tr -d ':')
+    WLAN_USER_IP=$(ip -4 addr show dev "$PHYSICAL_INTERFACE" 2>/dev/null | awk '/inet / {print $2}' | cut -d/ -f1 | head -n 1)
 
-# 定义更新后的编码 UA 参数
-PC_UA="Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20Chrome%2F144.0.0.0%20Safari%2F537.36%20Edg%2F144.0.0.0"
-MOBILE_UA="Mozilla%2F5.0%20(Linux%3B%20Android%208.0.0%3B%20SM-G955U%20Build%2FR16NW)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20Chrome%2F144.0.0.0%20Mobile%20Safari%2F537.36%20Edg%2F144.0.0.0"
+    if [ -z "$WLAN_USER_IP" ] || [ -z "$WLAN_USER_MAC" ]; then
+        log 2 "无法获取接口 '$PHYSICAL_INTERFACE' 的IP地址或MAC地址"
+        exit 6
+    fi
+}
 
-# 检查当前认证状态的函数
+# --- 状态检测函数 ---
 check_status() {
-    # 状态接口域名同步更新为 login.cqu.edu.cn
     local status_url="http://login.cqu.edu.cn/drcom/chkstatus?callback=dr1002&jsVersion=4.X&v=5505&lang=zh"
-    local response=$(mwan3 use $INTERFACE curl -s "$status_url")
-    
-    # 提取JSON中的result字段
+    local response=$(curl_req "$status_url")
+
+    if [ -z "$response" ]; then
+        log 1 "状态检查超时或无响应，假定未认证，准备强制登录..."
+        return 1
+    fi
+
+    if echo "$response" | grep -q "WISPAccessGatewayParam"; then
+        log 1 "请求被网关劫持 (未认证)，继续登录流程..."
+        return 1
+    fi
+
     local result=$(echo "$response" | grep -o '"result":[0-9]' | cut -d':' -f2)
-    
+
     if [ "$result" = "1" ]; then
         log 0 "当前已认证，无需重复登录"
         return 0
     elif [ "$result" = "0" ]; then
-        log 1 "当前未认证，继续登录流程..."
+        log 1 "状态返回0 (未认证)，继续登录流程..."
         return 1
     else
-        log 2 "状态检查失败，响应: $response"
+        log 2 "状态检查解析失败响应异常，强制尝试登录。响应: $response"
         return 1
     fi
 }
 
-# 执行登录函数
+# --- 执行登录函数 ---
 do_login() {
-    # 根据UA类型选择最新的URL和参数 (注意: 域名、term_ua、MAC地址全零以及版本号等已更新)
+    local LOGIN_URL=""
+
+    # 根据UA类型选择最新的URL和参数
     if [ "$UA_TYPE" = "pc" ]; then
-        local LOGIN_URL="http://login.cqu.edu.cn:801/eportal/portal/login?callback=dr1004&login_method=1&user_account=%2C0%2C$WLAN_USER_ACCOUNT&user_password=$WLAN_USER_PASSWORD&wlan_user_ip=$WLAN_USER_IP&wlan_user_ipv6=&wlan_user_mac=000000000000&wlan_ac_ip=&wlan_ac_name=&term_ua=$PC_UA&term_type=1&jsVersion=4.2.2&terminal_type=1&lang=zh-cn&v=1176&lang=zh-cn"
+        LOGIN_URL="http://login.cqu.edu.cn:801/eportal/portal/login?callback=dr1004&login_method=1&user_account=%2C0%2C$WLAN_USER_ACCOUNT&user_password=$WLAN_USER_PASSWORD&wlan_user_ip=$WLAN_USER_IP&wlan_user_ipv6=&wlan_user_mac=000000000000&wlan_ac_ip=&wlan_ac_name=&term_ua=$PC_UA&term_type=1&jsVersion=4.2.2&terminal_type=1&lang=zh-cn&v=1176&lang=zh-cn"
     else
-        local LOGIN_URL="http://login.cqu.edu.cn:801/eportal/portal/login?callback=dr1005&login_method=1&user_account=%2C1%2C$WLAN_USER_ACCOUNT&user_password=$WLAN_USER_PASSWORD&wlan_user_ip=$WLAN_USER_IP&wlan_user_ipv6=&wlan_user_mac=000000000000&wlan_ac_ip=&wlan_ac_name=&term_ua=$MOBILE_UA&term_type=2&jsVersion=4.2.2&terminal_type=2&lang=zh-cn&v=1176&lang=zh-cn"
+        LOGIN_URL="http://login.cqu.edu.cn:801/eportal/portal/login?callback=dr1005&login_method=1&user_account=%2C1%2C$WLAN_USER_ACCOUNT&user_password=$WLAN_USER_PASSWORD&wlan_user_ip=$WLAN_USER_IP&wlan_user_ipv6=&wlan_user_mac=000000000000&wlan_ac_ip=&wlan_ac_name=&term_ua=$MOBILE_UA&term_type=2&jsVersion=4.2.2&terminal_type=2&lang=zh-cn&v=1176&lang=zh-cn"
     fi
-    
-    log 1 "尝试登录 ($UA_TYPE UA)，使用IP: $WLAN_USER_IP"
-    local response=$(mwan3 use $INTERFACE curl -s "$LOGIN_URL")
-    
+
+    log 1 "尝试登录 ($UA_TYPE UA)，使用IP: $WLAN_USER_IP, MAC: $WLAN_USER_MAC"
+
+    local response=$(curl_req "$LOGIN_URL")
+
+    if [ -z "$response" ]; then
+        log 2 "登录请求超时或无网络响应！"
+        return 1
+    fi
+
     local json_response=$(echo "$response" | grep -o '{.*}')
-    
+
     if [ -n "$json_response" ]; then
         if echo "$json_response" | grep -q '"result":1'; then
-            log 1 "登录成功！响应: $json_response IP: $WLAN_USER_IP"
+            log 1 "登录成功！IP: $WLAN_USER_IP"
+            return 0
+        elif echo "$json_response" | grep -q '"ret_code":2' || echo "$json_response" | grep -q '已经在线'; then
+            log 1 "登录放行：该 IP 已经在线，无需重复认证！IP: $WLAN_USER_IP"
             return 0
         else
-            log 2 "登录失败！响应: $json_response"
+            log 2 "登录失败！网关拒绝响应: $json_response"
             return 1
         fi
     else
-        log 2 "无法解析响应: $response"
+        log 2 "登录失败！无法解析网关响应: $response"
         return 1
     fi
 }
 
-# 主执行流程
+# --- 主流程 ---
 main() {
+    init_check
+
     check_status
-    case $? in
-        0)  # 已认证
-            exit 2
-            ;;
-        1)  # 未认证
-            if do_login; then
-                exit 0
-            else
-                exit 1
-            fi
-            ;;
-        *)  # 检查失败
-            exit 3
-            ;;
-    esac
+    local status=$?
+
+    if [ $status -eq 0 ]; then
+        exit 2
+    else
+        if do_login; then
+            exit 0
+        else
+            exit 1
+        fi
+    fi
 }
 
-# 执行主函数
+# 执行主程序
 main
